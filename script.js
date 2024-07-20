@@ -1,121 +1,81 @@
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-
-const track = [
-    {x: canvas.width / 4, y: 0},
-    {x: 3 * canvas.width / 4, y: 0},
-    {x: 3 * canvas.width / 4, y: canvas.height},
-    {x: canvas.width / 4, y: canvas.height},
-];
-
-const car = { x: canvas.width / 2, y: canvas.height - 100, width: 50, height: 100, speed: 0, maxSpeed: 5, angle: 0 };
-const aiCar = { x: canvas.width / 2, y: 0, width: 50, height: 100, speed: 3, angle: 0 };
-
-let laps = 0;
-let lastTimestamp = 0;
-
-function drawTrack() {
-    ctx.fillStyle = 'gray';
-    ctx.beginPath();
-    ctx.moveTo(track[0].x, track[0].y);
-    for (let i = 1; i < track.length; i++) {
-        ctx.lineTo(track[i].x, track[i].y);
+const config = {
+    type: Phaser.AUTO,
+    width: window.innerWidth,
+    height: window.innerHeight,
+    backgroundColor: '#f3f3f3',
+    physics: {
+        default: 'arcade',
+        arcade: {
+            debug: false,
+        }
+    },
+    scene: {
+        preload: preload,
+        create: create,
+        update: update
     }
-    ctx.closePath();
-    ctx.fill();
+};
+
+let game = new Phaser.Game(config);
+let car;
+let cursors;
+let crashPopup;
+
+function preload() {
+    this.load.image('car', 'path/to/car/image.png');
+    this.load.image('track', 'path/to/track/image.png');
 }
 
-function drawCar(car, color) {
-    ctx.save();
-    ctx.translate(car.x, car.y);
-    ctx.rotate(car.angle);
-    ctx.fillStyle = color;
-    ctx.fillRect(-car.width / 2, -car.height / 2, car.width, car.height);
-    ctx.restore();
+function create() {
+    this.add.image(config.width / 2, config.height / 2, 'track');
+    car = this.physics.add.image(config.width / 2, config.height - 150, 'car');
+    car.setCollideWorldBounds(true);
+
+    cursors = this.input.keyboard.createCursorKeys();
+    crashPopup = document.getElementById('crashPopup');
 }
 
 function update() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawTrack();
-    drawCar(car, 'blue');
-    drawCar(aiCar, 'red');
-    aiCar.y += aiCar.speed;
-    if (aiCar.y > canvas.height) {
-        aiCar.y = -100;
-        aiCar.x = Math.random() * (canvas.width - aiCar.width);
-    }
-    document.getElementById('speed').textContent = `Speed: ${Math.abs(Math.round(car.speed * 10))}`;
-    document.getElementById('laps').textContent = `Laps: ${laps}`;
-}
+    car.setVelocity(0);
 
-function moveCar(direction) {
-    switch (direction) {
-        case 'left':
-            car.angle -= 0.1;
-            break;
-        case 'right':
-            car.angle += 0.1;
-            break;
-        case 'up':
-            car.speed = car.maxSpeed;
-            break;
-        case 'down':
-            car.speed = -car.maxSpeed;
-            break;
+    if (cursors.left.isDown) {
+        car.setAngularVelocity(-150);
+    } else if (cursors.right.isDown) {
+        car.setAngularVelocity(150);
+    } else {
+        car.setAngularVelocity(0);
+    }
+
+    if (cursors.up.isDown) {
+        this.physics.velocityFromRotation(car.rotation, 200, car.body.velocity);
+    } else if (cursors.down.isDown) {
+        this.physics.velocityFromRotation(car.rotation, -200, car.body.velocity);
+    }
+
+    if (checkCollision()) {
+        showCrashPopup();
     }
 }
 
-function applyPhysics() {
-    car.x += car.speed * Math.cos(car.angle);
-    car.y += car.speed * Math.sin(car.angle);
-    car.speed *= 0.98; // friction
-    if (car.x < 0) car.x = 0;
-    if (car.x > canvas.width) car.x = canvas.width;
-    if (car.y < 0) car.y = 0;
-    if (car.y > canvas.height) car.y = canvas.height;
+function checkCollision() {
+    if (car.x < 0 || car.x > config.width || car.y < 0 || car.y > config.height) {
+        return true;
+    }
+    return false;
 }
 
-document.getElementById('left').addEventListener('touchstart', () => moveCar('left'));
-document.getElementById('right').addEventListener('touchstart', () => moveCar('right'));
-document.getElementById('up').addEventListener('touchstart', () => moveCar('up'));
-document.getElementById('down').addEventListener('touchstart', () => moveCar('down'));
+function showCrashPopup() {
+    crashPopup.style.display = 'block';
+}
 
-document.getElementById('left').addEventListener('touchend', () => car.angle = 0);
-document.getElementById('right').addEventListener('touchend', () => car.angle = 0);
-document.getElementById('up').addEventListener('touchend', () => car.speed = 0);
-document.getElementById('down').addEventListener('touchend', () => car.speed = 0);
+function restartGame() {
+    car.setPosition(config.width / 2, config.height - 150);
+    car.setVelocity(0);
+    car.setAngularVelocity(0);
+    crashPopup.style.display = 'none';
+}
 
-window.addEventListener('keydown', (e) => {
-    switch (e.key) {
-        case 'ArrowLeft':
-            moveCar('left');
-            break;
-        case 'ArrowRight':
-            moveCar('right');
-            break;
-        case 'ArrowUp':
-            moveCar('up');
-            break;
-        case 'ArrowDown':
-            moveCar('down');
-            break;
-    }
+window.addEventListener('resize', () => {
+    game.scale.resize(window.innerWidth, window.innerHeight);
 });
-
-function gameLoop(timestamp) {
-    update();
-    applyPhysics();
-    requestAnimationFrame(gameLoop);
-    if (timestamp - lastTimestamp > 1000) {
-        lastTimestamp = timestamp;
-        if (car.y < 0) {
-            car.y = canvas.height;
-            laps++;
-        }
-    }
-}
-
-gameLoop();
-                   
+    
