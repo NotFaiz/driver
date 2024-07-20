@@ -1,148 +1,100 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-const carWidth = 50;
-const carHeight = 100;
-const carSpeed = 5;
-const obstacleWidth = 50;
-const obstacleHeight = 100;
-const obstacleSpeed = 3;
-const obstacleFrequency = 2000; // milliseconds
-const aiCarWidth = 50;
-const aiCarHeight = 100;
-const aiCarSpeed = 2;
+const track = [
+    {x: canvas.width / 4, y: 0},
+    {x: 3 * canvas.width / 4, y: 0},
+    {x: 3 * canvas.width / 4, y: canvas.height},
+    {x: canvas.width / 4, y: canvas.height},
+];
 
-let carX = canvas.width / 2 - carWidth / 2;
-let carY = canvas.height - carHeight - 10;
-let aiCarX = canvas.width / 2 - aiCarWidth / 2;
-let aiCarY = -aiCarHeight; // Start off-screen
-let obstacles = [];
-let keys = {};
-let score = 0;
-let startTime;
-let gameInterval;
-let obstacleInterval;
+const car = { x: canvas.width / 2, y: canvas.height - 100, width: 50, height: 100, speed: 0, maxSpeed: 5, angle: 0 };
+const aiCar = { x: canvas.width / 2, y: 0, width: 50, height: 100, speed: 3, angle: 0 };
 
-document.getElementById('startButton').addEventListener('click', startGame);
-document.getElementById('restartButton').addEventListener('click', restartGame);
-
-function startGame() {
-    document.getElementById('startScreen').style.display = 'none';
-    document.getElementById('gameArea').style.display = 'block';
-    startTime = Date.now();
-    gameInterval = setInterval(update, 1000 / 60); // 60 FPS
-    obstacleInterval = setInterval(() => {
-        if (Math.random() < 0.5) {
-            const x = Math.random() * (canvas.width - obstacleWidth);
-            obstacles.push({ x, y: -obstacleHeight });
-        }
-    }, obstacleFrequency);
-}
-
-function restartGame() {
-    document.getElementById('gameOverScreen').style.display = 'none';
-    document.getElementById('startScreen').style.display = 'block';
-    carX = canvas.width / 2 - carWidth / 2;
-    carY = canvas.height - carHeight - 10;
-    aiCarX = canvas.width / 2 - aiCarWidth / 2;
-    aiCarY = -aiCarHeight;
-    obstacles = [];
-    score = 0;
-    document.getElementById('score').textContent = 'Score: 0';
-    document.getElementById('timer').textContent = 'Time: 0';
-    clearInterval(gameInterval);
-    clearInterval(obstacleInterval);
-}
-
-document.addEventListener('keydown', (e) => {
-    keys[e.key] = true;
-});
-
-document.addEventListener('keyup', (e) => {
-    keys[e.key] = false;
-});
-
-function drawCar() {
-    ctx.fillStyle = 'red';
-    ctx.fillRect(carX, carY, carWidth, carHeight);
-}
-
-function drawAICar() {
-    ctx.fillStyle = 'green';
-    ctx.fillRect(aiCarX, aiCarY, aiCarWidth, aiCarHeight);
-}
-
-function drawObstacle(obstacle) {
-    ctx.fillStyle = 'blue';
-    ctx.fillRect(obstacle.x, obstacle.y, obstacleWidth, obstacleHeight);
-}
-
-function updateObstacles() {
-    obstacles.forEach(obstacle => {
-        obstacle.y += obstacleSpeed;
-    });
-
-    obstacles = obstacles.filter(obstacle => obstacle.y < canvas.height);
-
-    if (Math.random() < 0.05) {
-        const x = Math.random() * (canvas.width - obstacleWidth);
-        obstacles.push({ x, y: -obstacleHeight });
+function drawTrack() {
+    ctx.fillStyle = 'gray';
+    ctx.beginPath();
+    ctx.moveTo(track[0].x, track[0].y);
+    for (let i = 1; i < track.length; i++) {
+        ctx.lineTo(track[i].x, track[i].y);
     }
+    ctx.closePath();
+    ctx.fill();
 }
 
-function updateAICar() {
-    aiCarY += aiCarSpeed;
-    if (aiCarY > canvas.height) {
-        aiCarY = -aiCarHeight;
-        aiCarX = Math.random() * (canvas.width - aiCarWidth);
-    }
-}
-
-function detectCollisions() {
-    obstacles.forEach(obstacle => {
-        if (carX < obstacle.x + obstacleWidth &&
-            carX + carWidth > obstacle.x &&
-            carY < obstacle.y + obstacleHeight &&
-            carY + carHeight > obstacle.y) {
-            endGame();
-        }
-    });
-
-    if (carX < aiCarX + aiCarWidth &&
-        carX + carWidth > aiCarX &&
-        carY < aiCarY + aiCarHeight &&
-        carY + carHeight > aiCarY) {
-        endGame();
-    }
-}
-
-function endGame() {
-    clearInterval(gameInterval);
-    clearInterval(obstacleInterval);
-    document.getElementById('gameArea').style.display = 'none';
-    document.getElementById('gameOverScreen').style.display = 'block';
-    document.getElementById('finalScore').textContent = 'Score: ' + score;
+function drawCar(car, color) {
+    ctx.save();
+    ctx.translate(car.x, car.y);
+    ctx.rotate(car.angle);
+    ctx.fillStyle = color;
+    ctx.fillRect(-car.width / 2, -car.height / 2, car.width, car.height);
+    ctx.restore();
 }
 
 function update() {
-    if (keys['ArrowLeft'] && carX > 0) {
-        carX -= carSpeed;
-    }
-    if (keys['ArrowRight'] && carX < canvas.width - carWidth) {
-        carX += carSpeed;
-    }
-
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawCar();
-    drawAICar();
-    updateObstacles();
-    updateAICar();
-    obstacles.forEach(drawObstacle);
-    detectCollisions();
-
-    // Update score and timer
-    score += 1;
-    const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
-    document.getElementById('score').textContent = 'Score: ' + score;
-    document.getElementById('timer').textContent = 'Time: ' + elapsedTime;
+    drawTrack();
+    drawCar(car, 'blue');
+    drawCar(aiCar, 'red');
+    aiCar.y += aiCar.speed;
+    if (aiCar.y > canvas.height) {
+        aiCar.y = -100;
+        aiCar.x = Math.random() * (canvas.width - aiCar.width);
+    }
 }
+
+function moveCar(direction) {
+    switch (direction) {
+        case 'left':
+            car.angle -= 0.1;
+            break;
+        case 'right':
+            car.angle += 0.1;
+            break;
+        case 'up':
+            car.speed = car.maxSpeed;
+            break;
+        case 'down':
+            car.speed = -car.maxSpeed;
+            break;
+    }
+}
+
+function applyPhysics() {
+    car.x += car.speed * Math.cos(car.angle);
+    car.y += car.speed * Math.sin(car.angle);
+    car.speed *= 0.98; // friction
+}
+
+document.getElementById('left').addEventListener('touchstart', () => moveCar('left'));
+document.getElementById('right').addEventListener('touchstart', () => moveCar('right'));
+document.getElementById('up').addEventListener('touchstart', () => moveCar('up'));
+document.getElementById('down').addEventListener('touchstart', () => moveCar('down'));
+
+window.addEventListener('keydown', (e) => {
+    switch (e.key) {
+        case 'ArrowLeft':
+            moveCar('left');
+            break;
+        case 'ArrowRight':
+            moveCar('right');
+            break;
+        case 'ArrowUp':
+            moveCar('up');
+            break;
+        case 'ArrowDown':
+            moveCar('down');
+            break;
+    }
+});
+
+function gameLoop() {
+    update();
+    applyPhysics();
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+    
